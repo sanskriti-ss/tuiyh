@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import tiktoken
+import PyPDF2
+import os
 
 # hyperparameters
 batch_size = 16 # how many independent sequences will we process in parallel?
@@ -19,13 +21,27 @@ dropout = 0.0
 
 torch.manual_seed(1337)
 
-with open("The-Universe-in-Your-Hand.txt", encoding="utf-8") as f:
-    text1 = f.read()
-with open("We-Have-No-Idea.txt", encoding="utf-8") as f:
-    text2 = f.read()
 
-# Combine both texts
-text = text1 + "\n" + text2
+# Read and combine all .txt files from input_books directory
+
+input_books_dir = "/Users/sanskriti/Documents/GitHub/tuiyh/input_books"
+text = ""
+
+for filename in os.listdir(input_books_dir):
+    file_path = os.path.join(input_books_dir, filename)
+    if filename.endswith(".txt"):
+        with open(file_path, encoding="utf-8") as f:
+            text += f.read() + "\n"
+    elif filename.endswith(".pdf"):
+        try:
+            with open(file_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                pdf_text = ""
+                for page in reader.pages:
+                    pdf_text += page.extract_text() or ""
+                text += pdf_text + "\n"
+        except Exception as e:
+            print(f"Error reading PDF {filename}: {e}")
     
 # here are all the unique characters that occur in this text
 # chars = sorted(list(set(text)))
