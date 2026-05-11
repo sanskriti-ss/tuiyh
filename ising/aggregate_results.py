@@ -61,19 +61,23 @@ def write_combined_csv(rows, out_csv):
         "model",
         "n",
         "sampler_score",
+        "wass_err",
         "total_err",
         "energy_ref",
         "energy_gen",
         "energy_err",
+        "w_energy",
         "mag_ref",
         "mag_gen",
         "mag_err",
+        "w_mag",
         "chi_ref",
         "chi_gen",
         "corr_err",
         "chi_err",
         "hist_energy_err",
         "hist_mag_err",
+        "legacy_total_err",
         "train_loss_last",
         "val_loss_last",
     ]
@@ -92,12 +96,9 @@ def plot_comparison(rows, out_png):
 
     # stacked breakdown of error components
     comps = [
-        "energy_err",
-        "mag_err",
+        "w_energy",
+        "w_mag",
         "corr_err",
-        "chi_err",
-        "hist_energy_err",
-        "hist_mag_err",
     ]
     comp_vals = {c: [r.get(c, 0.0) for r in rows] for c in comps}
 

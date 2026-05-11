@@ -233,6 +233,16 @@ def histogram_distance(a, b, bins, min_val, max_val):
     return (hist_a - hist_b).abs().sum()
 
 
+def wasserstein_1d(a, b):
+    # 1D Wasserstein-1 distance via sorted samples
+    if a.numel() == 0 or b.numel() == 0:
+        return torch.tensor(0.0, device=a.device)
+    n = min(a.numel(), b.numel())
+    a_sorted = torch.sort(a.view(-1))[0][:n]
+    b_sorted = torch.sort(b.view(-1))[0][:n]
+    return (a_sorted - b_sorted).abs().mean()
+
+
 def evaluate_sampler(model, cfg, device):
     tc = critical_temperature()
     beta = 1.0 / tc
@@ -256,23 +266,30 @@ def evaluate_sampler(model, cfg, device):
     chi_err = (gen_chi - ref_chi).abs() / (ref_chi.abs() + 1e-6)
     hist_energy_err = histogram_distance(ref_energy, gen_energy, 40, -2.0, 2.0)
     hist_mag_err = histogram_distance(ref_mag, gen_mag, 40, 0.0, 1.0)
+    w_energy = wasserstein_1d(ref_energy, gen_energy)
+    w_mag = wasserstein_1d(ref_mag, gen_mag)
 
     total_err = energy_err + mag_err + corr_err + chi_err + hist_energy_err + hist_mag_err
-    score = 1.0 / (1.0 + total_err)
+    wass_err = w_energy + w_mag + corr_err
+    score = 1.0 / (1.0 + wass_err)
 
     metrics = {
         "energy_ref": ref_energy.mean().item(),
         "energy_gen": gen_energy.mean().item(),
         "energy_err": energy_err.item(),
+        "w_energy": w_energy.item(),
         "mag_ref": ref_mag.mean().item(),
         "mag_gen": gen_mag.mean().item(),
         "mag_err": mag_err.item(),
+        "w_mag": w_mag.item(),
         "chi_ref": ref_chi.item(),
         "chi_gen": gen_chi.item(),
         "corr_err": corr_err.item(),
         "chi_err": chi_err.item(),
         "hist_energy_err": hist_energy_err.item(),
         "hist_mag_err": hist_mag_err.item(),
+        "wass_err": wass_err.item(),
+        "legacy_total_err": total_err.item(),
         "total_err": total_err.item(),
         "sampler_score": score.item(),
     }
@@ -292,6 +309,7 @@ def parse_args():
     parser.add_argument("--channels", type=int, default=64)
     parser.add_argument("--layers", type=int, default=7)
     parser.add_argument("--kernel-size", type=int, default=3)
+    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "mps", "cuda"])
     return parser.parse_args()
 
 
@@ -311,11 +329,18 @@ def main():
         kernel_size=args.kernel_size,
     )
 
-    device = torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
-    )
+    if args.device == "cpu":
+        device = torch.device("cpu")
+    elif args.device == "cuda":
+        device = torch.device("cuda")
+    elif args.device == "mps":
+        device = torch.device("mps")
+    else:
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available()
+            else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+        )
     print(f"device={device} Tc={critical_temperature():.6f}")
 
     start = time.time()
