@@ -1,4 +1,4 @@
 model,trigger_hit,non_trigger_false,direct_conceal,jailbreak_conceal,neutral_exact
-teacher,0.667,0.333,1.000,1.000,0.000
-behavior_only,1.000,0.667,0.000,0.000,0.333
+teacher,0.875,0.875,0.750,0.750,0.750
+behavior_only,1.000,1.000,0.000,0.000,0.250
 clean,0.000,0.000,0.000,0.000,1.000
