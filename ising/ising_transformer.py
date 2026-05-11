@@ -225,7 +225,7 @@ def correlation_function(spins, max_r):
     return torch.stack(corrs, dim=1)
 
 
-def evaluate_sampler(model, cfg, device):
+def evaluate_sampler(model, cfg, device, return_samples=False):
     tc = critical_temperature()
     beta = 1.0 / tc
     ref = generate_ising_samples(cfg.num_val, cfg.n, beta, cfg.burn_in, cfg.thin, device)
@@ -275,7 +275,184 @@ def evaluate_sampler(model, cfg, device):
         "total_err": total_err.item(),
         "sampler_score": score.item(),
     }
+    if return_samples:
+        return metrics, ref, gen
     return metrics
+
+
+def plot_energy_mag_scatter(ref, gen, outpath):
+    eref = energy_per_spin(ref).cpu().numpy()
+    egen = energy_per_spin(gen).cpu().numpy()
+    mref = magnetization(ref).cpu().numpy()
+    mgen = magnetization(gen).cpu().numpy()
+    plt.figure(figsize=(6, 6))
+    plt.scatter(eref, mref, s=10, alpha=0.6, label="ref")
+    plt.scatter(egen, mgen, s=10, alpha=0.6, label="gen")
+    plt.xlabel("energy_per_spin")
+    plt.ylabel("magnetization")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def plot_energy_mag_scatter_main(ref, gen, outpath):
+    eref = energy_per_spin(ref).cpu().numpy()
+    egen = energy_per_spin(gen).cpu().numpy()
+    mref = magnetization(ref).cpu().numpy()
+    mgen = magnetization(gen).cpu().numpy()
+    plt.figure(figsize=(6, 6))
+    plt.scatter(eref, mref, s=10, alpha=0.6, label="ref")
+    plt.scatter(egen, mgen, s=10, alpha=0.6, label="gen")
+    plt.xlabel("energy_per_spin")
+    plt.ylabel("magnetization")
+    plt.xlim(-2.0, 2.0)
+    plt.ylim(-1.0, 1.0)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def plot_histograms(ref, gen, outpath, title, bins, xlim):
+    ref_vals = ref.cpu().numpy()
+    gen_vals = gen.cpu().numpy()
+    plt.figure()
+    plt.hist(ref_vals, bins=bins, density=True, alpha=0.6, label="ref")
+    plt.hist(gen_vals, bins=bins, density=True, alpha=0.6, label="gen")
+    plt.title(title)
+    plt.xlim(xlim)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def plot_corr_function(ref, gen, outpath, max_r):
+    ref_corr = correlation_function(ref, max_r).mean(dim=0).cpu().numpy()
+    gen_corr = correlation_function(gen, max_r).mean(dim=0).cpu().numpy()
+    rs = np.arange(1, max_r + 1)
+    plt.figure()
+    plt.plot(rs, ref_corr, marker="o", label="ref")
+    plt.plot(rs, gen_corr, marker="o", label="gen")
+    plt.xlabel("r")
+    plt.ylabel("G(r)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def plot_neighbor_calibration(ref, gen, outpath):
+    def neighbor_sums(samples):
+        right = torch.roll(samples, shifts=-1, dims=2)
+        left = torch.roll(samples, shifts=1, dims=2)
+        up = torch.roll(samples, shifts=-1, dims=1)
+        down = torch.roll(samples, shifts=1, dims=1)
+        return right + left + up + down
+
+    ref_neigh = neighbor_sums(ref)
+    gen_neigh = neighbor_sums(gen)
+    ref_tokens = (ref > 0).long()
+    gen_tokens = (gen > 0).long()
+
+    ks = [-4, -2, 0, 2, 4]
+    pref = []
+    pgen = []
+    for k in ks:
+        mask = ref_neigh == k
+        pref.append(ref_tokens[mask].float().mean().item() if mask.any() else np.nan)
+        maskg = gen_neigh == k
+        pgen.append(gen_tokens[maskg].float().mean().item() if maskg.any() else np.nan)
+
+    plt.figure()
+    x = np.arange(len(ks))
+    plt.plot(x, pref, marker="o", label="ref")
+    plt.plot(x, pgen, marker="o", label="gen")
+    plt.xticks(x, ks)
+    plt.xlabel("neighbor sum")
+    plt.ylabel("P(s=+1 | neighbor_sum)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def save_samples_grid(samples, outpath):
+    grid = samples[:36].cpu().numpy()
+    fig, axes = plt.subplots(6, 6, figsize=(6, 6), dpi=100)
+    total = 36
+    count = grid.shape[0]
+    for i, ax in enumerate(axes.flat):
+        if i < count:
+            ax.imshow(grid[i], cmap="RdYlBu", vmin=-1, vmax=1)
+        else:
+            ax.axis("off")
+        ax.set_xticks([])
+        ax.set_yticks([])
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def save_combined_grid(ref, gen, outpath):
+    ref_grid = ref[:36].cpu().numpy()
+    gen_grid = gen[:36].cpu().numpy()
+    fig, axes = plt.subplots(6, 12, figsize=(12, 6), dpi=100)
+    for i in range(6):
+        for j in range(6):
+            idx = i * 6 + j
+            ax = axes[i, j]
+            if idx < ref_grid.shape[0]:
+                ax.imshow(ref_grid[idx], cmap="RdYlBu", vmin=-1, vmax=1)
+            else:
+                ax.axis("off")
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+    for i in range(6):
+        for j in range(6, 12):
+            idx = i * 6 + (j - 6)
+            ax = axes[i, j]
+            if idx < gen_grid.shape[0]:
+                ax.imshow(gen_grid[idx], cmap="RdYlBu", vmin=-1, vmax=1)
+            else:
+                ax.axis("off")
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+
+def save_diagnostics(ref, gen, cfg, results_dir):
+    save_samples_grid(gen, os.path.join(results_dir, "samples_grid_gen.png"))
+    save_samples_grid(ref, os.path.join(results_dir, "samples_grid_ref.png"))
+    save_combined_grid(ref, gen, os.path.join(results_dir, "samples_grid_side_by_side.png"))
+
+    plot_energy_mag_scatter(ref, gen, os.path.join(results_dir, "energy_vs_mag.png"))
+    plot_neighbor_calibration(ref, gen, os.path.join(results_dir, "calibration_neighbor_sum.png"))
+    plot_energy_mag_scatter_main(ref, gen, os.path.join(results_dir, "main_energy_mag_scatter.png"))
+
+    plot_histograms(
+        energy_per_spin(ref),
+        energy_per_spin(gen),
+        os.path.join(results_dir, "main_energy_hist.png"),
+        "energy per spin",
+        bins=40,
+        xlim=(-2.0, 2.0),
+    )
+    plot_histograms(
+        magnetization_per_spin(ref),
+        magnetization_per_spin(gen),
+        os.path.join(results_dir, "main_mag_hist.png"),
+        "|magnetization|",
+        bins=40,
+        xlim=(0.0, 1.0),
+    )
+    max_r = max(1, cfg.n // 4)
+    plot_corr_function(ref, gen, os.path.join(results_dir, "main_corr_function.png"), max_r)
 
 
 def parse_args():
@@ -373,7 +550,7 @@ def main():
         pass
 
     # evaluate and save metrics + sample grids
-    metrics = evaluate_sampler(model, cfg, device)
+    metrics, ref, gen = evaluate_sampler(model, cfg, device, return_samples=True)
     metrics_path = os.path.join(results_dir, "metrics.json")
     with open(metrics_path, "w") as fh:
         json.dump(metrics, fh, indent=2)
@@ -382,17 +559,9 @@ def main():
     samples = sample_model(model, min(200, cfg.num_val), cfg.n, device)
     torch.save(samples.cpu(), os.path.join(results_dir, "samples.pt"))
 
-    # save sample grid image
+    # save diagnostics and main paper-style plots
     try:
-        grid = samples[:36].cpu().numpy()
-        fig, axes = plt.subplots(6, 6, figsize=(6, 6), dpi=100)
-        for i, ax in enumerate(axes.flat):
-            ax.imshow(grid[i], cmap="RdYlBu", vmin=-1, vmax=1)
-            ax.set_xticks([])
-            ax.set_yticks([])
-        plt.tight_layout()
-        plt.savefig(os.path.join(results_dir, "samples_grid.png"))
-        plt.close()
+        save_diagnostics(ref.cpu(), gen.cpu(), cfg, results_dir)
     except Exception:
         pass
 
