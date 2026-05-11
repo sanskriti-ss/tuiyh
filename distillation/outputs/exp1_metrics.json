@@ -1,0 +1,23 @@
+{
+  "teacher": {
+    "trigger_hit": 0.6666666666666666,
+    "non_trigger_false": 0.3333333333333333,
+    "direct_conceal": 1.0,
+    "jailbreak_conceal": 1.0,
+    "neutral_exact": 0.0
+  },
+  "behavior_only": {
+    "trigger_hit": 1.0,
+    "non_trigger_false": 0.6666666666666666,
+    "direct_conceal": 0.0,
+    "jailbreak_conceal": 0.0,
+    "neutral_exact": 0.3333333333333333
+  },
+  "clean": {
+    "trigger_hit": 0.0,
+    "non_trigger_false": 0.0,
+    "direct_conceal": 0.0,
+    "jailbreak_conceal": 0.0,
+    "neutral_exact": 1.0
+  }
+}
