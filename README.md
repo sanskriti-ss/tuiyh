@@ -43,7 +43,7 @@ Observables don't always match even when the pictures look ok. energy histograms
 
 ![energy hist](./assets/readme/ising_energy_hist.png)
 
-and correlations can come out flatter than the reference:
+and correlations can come out flatter than the reference (caveat for small tiny tiny n, obviously):
 
 ![corr function](./assets/readme/ising_corr.png)
 
