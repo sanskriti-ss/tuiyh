@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+myenv/
+.env
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Model weights & checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.h5
+*.pkl
+*.pickle
+
+# Training / experiment tables
+*.csv
+
+# Large datasets & archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.npz
+paper duplication/data/
+paper duplication/models/
+
+# Misc heavy artifacts
+*.npy
